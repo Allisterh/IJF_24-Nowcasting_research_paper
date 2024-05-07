@@ -1,0 +1,111 @@
+---
+title: "Real-time recursive estimation of the monthly factor model"
+format: html
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+source("R/intro.R")
+source("R/sd_dfm.R")
+```
+
+#### FRED MD
+```{r, warning=FALSE}
+## Selected variables (headline variables as in Banbura (handbook ECB working paper))
+selection_var <- c(
+    "RPI", "INDPRO", "CUMFNS", # group 1 : manufacturing #RPI
+    "CE16OV", "UNRATE", "PAYEMS", # group 2 : labor
+    "DPCERA3M086SBEA", "RETAILx", "UMCSENTx",
+    "S&P 500",
+    "GDP"
+)
+
+load("data/vintages.Rdata")
+```
+
+#### Rolling estimation
+```{r, cache = FALSE}
+# LSS, LS, or L model
+spec <- "LSS"
+nb_it <- 10
+
+j <- 1
+monthly_dfm_results <- list()
+mle_pars <- list()
+
+for (vintage in 1:length(list_vintages)) {
+    if (list_vintages[[vintage]]$vintage >= "Feb 2007") {
+        set.seed(1234)
+
+        show(list_vintages[[vintage]]$vintage)
+
+        outcome <- list_vintages[[vintage]]$target_gdp_figure[1]
+
+        df <- list_vintages[[vintage]]$df %>%
+            gather(-date, key = "var", value = "values") %>%
+            filter(
+                date >= "Feb 1959",
+                date <= "Dec 2023"
+            ) %>%
+            filter(var %in% selection_var) %>%
+            spread(key = "var", value = "values") %>%
+            relocate(date, GDP, INDPRO)
+
+        while (!(month(last(df$date)) %in% c(3, 6, 9, 12))) {
+            df %<>% add_row(date = last(df$date) + 1 / 12)
+        }
+
+        y <- as.matrix(df[, -c(1, 2)])
+
+        freq <- "M"
+
+        if (is.null(mle_pars[[paste0(colnames(y), collapse = "")]])) {
+            init_par <- NULL
+        } else {
+            init_par <- MLE$par
+        }
+        esti <- seq_esti(y, init_par = init_par, nb_it, spec, freq)
+
+        MLE_model <- esti
+        model <- MLE_model$model
+        run_0 <- MLE_model$filter_result$model
+
+        MLE <- MLE_model$MLE
+        filter_result <- MLE_model$filter_result
+        mle_pars[[paste0(colnames(y), collapse = "")]] <- MLE$par
+
+        simulated_factors <- out_of_sample_evaluation(filter_result, model, outcome)
+
+        df %<>%
+            select(date, GDP) %>%
+            mutate(
+                loc_CF = MLE_model$filter_result$a_f[ncol(y) * 5 + 1, ],
+                scale_CF = MLE_model$filter_result$a_scale_f[ncol(y) + 1, ],
+                shape_CF = MLE_model$filter_result$a_shape_f[ncol(y) + 1, ],
+                vintage = list_vintages[[vintage]]$vintage_date,
+                outcome = outcome
+            )
+
+        loc_CF <- filter_result$a_f[ncol(y) * 5 + 1, model$N]
+        scale_CF <- filter_result$a_scale_f[ncol(y) + 1, model$N]
+        shape_CF <- filter_result$a_shape_f[ncol(y) + 1, model$N]
+
+        outcome <- list_vintages[[vintage]]$target_gdp_figure
+
+        monthly_dfm_results[[j]] <- list(
+            df = df,
+            simulated_factors = simulated_factors,
+            mle_par = MLE$par,
+            mle = MLE$value,
+            model = model,
+            outcome = outcome,
+            vintage = vintage
+        )
+        j <- j + 1
+    }
+}
+
+load("results/monthly_dfm.Rdata")
+monthly_dfm[[spec]] <- monthly_dfm_results
+save(monthly_dfm, file = "results/monthly_dfm.Rdata", compress = "xz")
+```
+

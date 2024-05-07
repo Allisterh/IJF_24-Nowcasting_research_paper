@@ -1,0 +1,554 @@
+---
+title: "Appendix C Simulation experiments"
+format: html
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+source("R/intro.R")
+source("R/sd_dfm.R")
+```
+
+#### FRED MD
+```{r, warning=FALSE}
+## Selected variables (headline variables as in Banbura (handbook ECB working paper))
+selection_var <- c(
+    "RPI", "INDPRO", "CUMFNS", # group 1 :
+    "CE16OV", "UNRATE", "PAYEMS", # group 2 : labor
+    "DPCERA3M086SBEA", "RETAILx", "UMCSENTx",
+    "S&P 500",
+    "GDP"
+)
+
+load("data/vintages.Rdata")
+```
+
+## Initial estimation (monthly) estimation to be used for initialisation
+```{r, cache=FALSE}
+set.seed(1234)
+
+out_of_sample_stats <- list()
+
+spec <- "LSS"
+
+vintage <- length(list_vintages)
+
+df <- list_vintages[[vintage]]$df %>%
+    gather(-date, key = "var", value = "values") %>%
+    filter(
+        date >= "Feb 1959",
+        date <= "Dec 2024"
+    ) %>%
+    filter(var %in% selection_var) %>%
+    spread(key = "var", value = "values") %>%
+    relocate(date, GDP, INDPRO)
+
+while (!(month(last(df$date)) %in% c(3, 6, 9, 12))) {
+    df %<>% add_row(date = last(df$date) + 1 / 12)
+}
+
+y <- as.matrix(df[, -c(1, 2)])
+
+esti <- seq_esti(y, init_par = NULL, nb_it = 0, spec, freq = "M")
+```
+
+## Simulation DGP
+```{r}
+set.seed(1234)
+signal <- list()
+a <- list()
+a_scale <- list()
+a_shape <- list()
+N <- 5e3
+Tt <- 12 * 10
+
+for (i in 1:N) {
+    dgp_i <- DGP_DFM(esti$filter_result, Tt)
+    a[[i]] <- as_tibble(t(dgp_i$a[c(1, c(1:(ncol(y) - 1)) * 5 + 1), ])) %>%
+        mutate(
+            draw = i,
+            date = seq(max(df$date) + 1 / 12, max(df$date) + Tt, by = 1)
+        )
+    a_scale[[i]] <- as_tibble(t(dgp_i$a_scale[1:ncol(y), ])) %>%
+        mutate(
+            draw = i,
+            date = seq(max(df$date) + 1 / 12, max(df$date) + Tt, by = 1)
+        )
+    a_shape[[i]] <- as_tibble(t(dgp_i$a_shape[1:ncol(y), ])) %>%
+        mutate(
+            draw = i,
+            date = seq(max(df$date) + 1 / 12, max(df$date) + Tt, by = 1)
+        )
+    if (i %% 100 == 0) {
+        cat(i)
+    }
+}
+
+## loc
+df_loc <- bind_rows(a) %>%
+    mutate(draw = as.character(draw)) %>%
+    gather(-draw, -date, key = "series", value = "value") %>%
+    mutate(value = round(value, 6)) %>%
+    group_by(date, series) %>%
+    summarise(
+        q01 = quantile(value, 0.01),
+        q05 = quantile(value, 0.05),
+        q1 = quantile(value, 0.1),
+        q2 = quantile(value, 0.2),
+        q3 = quantile(value, 0.3),
+        q4 = quantile(value, 0.4),
+        q5 = quantile(value, 0.5),
+        q6 = quantile(value, 0.6),
+        q7 = quantile(value, 0.7),
+        q8 = quantile(value, 0.8),
+        q9 = quantile(value, 0.9),
+        q95 = quantile(value, 0.95),
+        q99 = quantile(value, 0.99)
+    ) %>%
+    gather(-date, -series, key = quantile, value = value)
+
+## scale
+df_scale <- bind_rows(a_scale) %>%
+    mutate(draw = as.character(draw)) %>%
+    gather(-draw, -date, key = "series", value = "value") %>%
+    mutate(value = round(value, 6)) %>%
+    group_by(date, series) %>%
+    summarise(
+        q01 = quantile(value, 0.01),
+        q05 = quantile(value, 0.05),
+        q1 = quantile(value, 0.1),
+        q2 = quantile(value, 0.2),
+        q3 = quantile(value, 0.3),
+        q4 = quantile(value, 0.4),
+        q5 = quantile(value, 0.5),
+        q6 = quantile(value, 0.6),
+        q7 = quantile(value, 0.7),
+        q8 = quantile(value, 0.8),
+        q9 = quantile(value, 0.9),
+        q95 = quantile(value, 0.95),
+        q99 = quantile(value, 0.99)
+    ) %>%
+    gather(-date, -series, key = quantile, value = value)
+
+## shape
+df_shape <- bind_rows(a_shape) %>%
+    mutate(draw = as.character(draw)) %>%
+    gather(-draw, -date, key = "series", value = "value") %>%
+    mutate(value = round(value, 6)) %>%
+    group_by(date, series) %>%
+    summarise(
+        q01 = quantile(value, 0.01),
+        q05 = quantile(value, 0.05),
+        q1 = quantile(value, 0.1),
+        q2 = quantile(value, 0.2),
+        q3 = quantile(value, 0.3),
+        q4 = quantile(value, 0.4),
+        q5 = quantile(value, 0.5),
+        q6 = quantile(value, 0.6),
+        q7 = quantile(value, 0.7),
+        q8 = quantile(value, 0.8),
+        q9 = quantile(value, 0.9),
+        q95 = quantile(value, 0.95),
+        q99 = quantile(value, 0.99)
+    ) %>%
+    gather(-date, -series, key = quantile, value = value)
+
+save(df_loc, df_scale, df_shape, file = "results/sim_dgp.Rdata", compress = "xz")
+```
+
+#### plot
+```{r}
+load("Results/sim_dgp.Rdata")
+
+ga <- ggplot(df_loc) +
+    geom_line(aes(date, value, colour = quantile), alpha = 1) +
+    facet_wrap(~series, nrow = 2, scales = "free_y") +
+    ggtitle("Trends in the location parameters") +
+    theme +
+    theme(
+        plot.title = element_text(size = 10),
+        axis.text = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        axis.text.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "bottom"
+    ) +
+    xlab("Months") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15)
+
+gb <- ggplot(df_scale) +
+    geom_line(aes(date, value, colour = quantile), alpha = 1) +
+    ggtitle("Trends in the scale parameters") +
+    facet_wrap(~series, nrow = 2, scales = "free_y") +
+    theme +
+    theme(
+        plot.title = element_text(size = 10),
+        axis.text = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        axis.text.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "bottom"
+    ) +
+    xlab("Months") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15) #+
+
+gc <- ggplot(df_shape) +
+    geom_line(aes(date, value, colour = quantile), alpha = 1) +
+    ggtitle("Trends in the shape parameters") +
+    facet_wrap(~series, nrow = 2, scales = "free_y") +
+    theme +
+    theme(
+        plot.title = element_text(size = 10),
+        axis.text = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        axis.text.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "bottom"
+    ) +
+    xlab("Months") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15)
+
+plt <- ggarrange(ga, gb, gc,
+    ncol = 1, nrow = 3,
+    common.legend = TRUE, legend = "right"
+)
+
+ggsave("figures/fig9.pdf",
+    plot = plt,
+    scale = 1, width = 7, height = 5
+)
+```
+
+## Simulation filter
+```{r}
+# This set of simulation randomise the initial values of the scale, shape and location trends and run the filter forward to see the components behave
+set.seed(1234)
+
+model_0 <- esti$filter_result$model
+
+signal <- list()
+a <- list()
+a_scale <- list()
+a_shape <- list()
+N <- 50
+
+res_0 <- filter_list(model_0)
+
+k <- 1
+for (i in 1:N) {
+    h <- 1
+    for (j in 1:ncol(y)) {
+        # loc
+        model_i <- model_0
+        model_i$a_loc_init[h:(h + 4)] <- model_i$a_loc_init[h:(h + 4)] + rnorm(1, 0, sd(res_0$a[h, ]))
+        res_i <- filter_list(model_i)
+        a[[k]] <- tibble(value = res_i$a[h, -ncol(res_i$a)]) %>%
+            mutate(
+                draw = i,
+                date = df$date,
+                series = j
+            )
+        h <- h + 5
+
+        # scale
+        model_i <- model_0
+        model_i$a_scale_init[j] <- model_i$a_scale_init[j] + rnorm(1, 0, sd(res_0$a_scale[j, ]))
+        res_i <- filter_list(model_i)
+        a_scale[[k]] <- tibble(value = res_i$a_scale[j, -ncol(res_i$a_scale)]) %>%
+            mutate(
+                draw = i,
+                date = df$date,
+                series = j
+            )
+
+        # shape
+        model_i <- model_0
+        model_i$a_shape_init[j] <- model_i$a_shape_init[j] + rnorm(1, 0, sd(res_0$a_shape[j, ]))
+        res_i <- filter_list(model_i)
+        a_shape[[k]] <- tibble(value = res_i$a_shape[j, -ncol(res_i$a_shape)]) %>%
+            mutate(
+                draw = i,
+                date = df$date,
+                series = j
+            )
+        k <- k + 1
+    }
+    cat(i)
+}
+
+## loc
+df_loc <- bind_rows(a) %>%
+    mutate(
+        draw = as.character(draw),
+        value = round(value, 6)
+    ) %>%
+    group_by(date, series) %>%
+    summarise(
+        q01 = quantile(value, 0.01),
+        q05 = quantile(value, 0.05),
+        q1 = quantile(value, 0.1),
+        q2 = quantile(value, 0.2),
+        q3 = quantile(value, 0.3),
+        q4 = quantile(value, 0.4),
+        q5 = quantile(value, 0.5),
+        q6 = quantile(value, 0.6),
+        q7 = quantile(value, 0.7),
+        q8 = quantile(value, 0.8),
+        q9 = quantile(value, 0.9),
+        q95 = quantile(value, 0.95),
+        q99 = quantile(value, 0.99)
+    ) %>%
+    gather(-date, -series, key = quantile, value = value)
+
+## scale
+df_scale <- bind_rows(a_scale) %>%
+    mutate(
+        draw = as.character(draw),
+        value = round(value, 6)
+    ) %>%
+    group_by(date, series) %>%
+    summarise(
+        q01 = quantile(value, 0.01),
+        q05 = quantile(value, 0.05),
+        q1 = quantile(value, 0.1),
+        q2 = quantile(value, 0.2),
+        q3 = quantile(value, 0.3),
+        q4 = quantile(value, 0.4),
+        q5 = quantile(value, 0.5),
+        q6 = quantile(value, 0.6),
+        q7 = quantile(value, 0.7),
+        q8 = quantile(value, 0.8),
+        q9 = quantile(value, 0.9),
+        q95 = quantile(value, 0.95),
+        q99 = quantile(value, 0.99)
+    ) %>%
+    gather(-date, -series, key = quantile, value = value)
+
+## shape
+df_shape <- bind_rows(a_shape) %>%
+    mutate(
+        draw = as.character(draw),
+        value = round(value, 6)
+    ) %>%
+    group_by(date, series) %>%
+    summarise(
+        q01 = quantile(value, 0.01),
+        q05 = quantile(value, 0.05),
+        q1 = quantile(value, 0.1),
+        q2 = quantile(value, 0.2),
+        q3 = quantile(value, 0.3),
+        q4 = quantile(value, 0.4),
+        q5 = quantile(value, 0.5),
+        q6 = quantile(value, 0.6),
+        q7 = quantile(value, 0.7),
+        q8 = quantile(value, 0.8),
+        q9 = quantile(value, 0.9),
+        q95 = quantile(value, 0.95),
+        q99 = quantile(value, 0.99)
+    ) %>%
+    gather(-date, -series, key = quantile, value = value)
+
+save(df_loc, df_scale, df_shape, file = "results/sim_filter.Rdata", compress = "xz")
+```
+
+#### plot
+```{r}
+load("results/sim_filter.Rdata")
+
+ga <- ggplot(df_loc) +
+    geom_line(aes(date, value, colour = quantile), alpha = 0.75, line = 0.25) +
+    facet_wrap(~series, nrow = 2, scales = "free_y") +
+    ggtitle("Trends in the location parameters") +
+    theme +
+    theme(
+        plot.title = element_text(size = 10),
+        axis.text = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        axis.text.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "bottom"
+    ) +
+    xlab("Months") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15)
+
+gb <- ggplot(df_scale) +
+    geom_line(aes(date, value, colour = quantile), alpha = 0.75, line = 0.25) +
+    facet_wrap(~series, nrow = 2, scales = "free_y") +
+    ggtitle("Trends in the scale parameters") +
+    theme +
+    theme(
+        plot.title = element_text(size = 10),
+        axis.text = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        axis.text.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "bottom"
+    ) +
+    xlab("Months") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15)
+
+gc <- ggplot(df_shape) +
+    geom_line(aes(date, value, colour = quantile), alpha = 0.75, line = 0.25) +
+    facet_wrap(~series, nrow = 2, scales = "free_y") +
+    ggtitle("Trends in the shape parameters") +
+    theme +
+    theme(
+        plot.title = element_text(size = 10),
+        axis.text = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        axis.text.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "bottom"
+    ) +
+    xlab("Months") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15)
+
+plt <- ggarrange(ga, gb, gc,
+    ncol = 1, nrow = 3,
+    common.legend = TRUE, legend = "right"
+)
+
+ggsave("Figures/fig10.pdf",
+    plot = plt,
+    scale = 1, width = 7, height = 6
+)
+```
+
+## Simulation by adding model-based noise
+```{r}
+set.seed(1234)
+N <- 1e3
+
+df_CF_loc <- c()
+df_CF_scale <- c()
+df_CF_shape <- c()
+
+original_CF_loc <- esti$filter_result$a_f[ncol(y) * 5 + 1, ]
+original_CF_scale <- esti$filter_result$a_scale_f[ncol(y) + 1, ]
+original_CF_shape <- esti$filter_result$a_shape_f[ncol(y) + 1, ]
+
+for (i in 1:N) {
+    generated_model <- gen_obs_DFM(esti$filter_result)
+
+    esti_i <- seq_esti(generated_model$y, init_par = NULL, nb_it = 0, spec = "LSS", freq = "M")
+
+    estimated_CF_loc <- esti_i$filter_result$a_f[ncol(y) * 5 + 1, ]
+    estimated_CF_scale <- esti_i$filter_result$a_scale_f[ncol(y) + 1, ]
+    estimated_CF_shape <- esti_i$filter_result$a_shape_f[ncol(y) + 1, ]
+
+    df_CF_loc <- cbind(df_CF_loc, estimated_CF_loc)
+    df_CF_scale <- cbind(df_CF_scale, estimated_CF_scale)
+    df_CF_shape <- cbind(df_CF_shape, estimated_CF_shape)
+
+    show(i)
+}
+
+save(df_CF_loc, df_CF_scale, df_CF_shape, file = "results/sim_noise.Rdata", compress = "xz")
+```
+
+#### Graph 
+```{r}
+load("results/sim_noise.Rdata")
+
+mean(apply(df_CF_loc, 1, sd))
+mean(apply(df_CF_scale, 1, sd))
+mean(apply(df_CF_shape, 1, sd))
+
+df_CF_loc_g <- as_tibble(df_CF_loc) %>%
+    mutate(
+        date = df$date,
+        mean = apply(df_CF_loc, 1, mean),
+        high_90 = apply(df_CF_loc, 1, HDInterval::hdi, credMass = 0.9)[2, ],
+        low_90 = apply(df_CF_loc, 1, HDInterval::hdi, credMass = 0.9)[1, ],
+        high_68 = apply(df_CF_loc, 1, HDInterval::hdi, credMass = 0.68)[2, ],
+        low_68 = apply(df_CF_loc, 1, HDInterval::hdi, credMass = 0.68)[1, ]
+    ) %>%
+    gather(-date, -mean, -high_90, -low_90, -high_68, -low_68, key = "sim", value = "value") %>%
+    filter(sim == "V2")
+
+df_CF_scale_g <- as_tibble(df_CF_scale) %>%
+    mutate(
+        date = df$date,
+        mean = apply(df_CF_scale, 1, mean),
+        high_90 = apply(df_CF_scale, 1, HDInterval::hdi, credMass = 0.9)[2, ],
+        low_90 = apply(df_CF_scale, 1, HDInterval::hdi, credMass = 0.9)[1, ],
+        high_68 = apply(df_CF_scale, 1, HDInterval::hdi, credMass = 0.68)[2, ],
+        low_68 = apply(df_CF_scale, 1, HDInterval::hdi, credMass = 0.68)[1, ]
+    ) %>%
+    gather(-date, -mean, -high_90, -low_90, -high_68, -low_68, key = "sim", value = "value") %>%
+    filter(sim == "V2")
+
+df_CF_shape_g <- as_tibble(df_CF_shape) %>%
+    mutate(
+        date = df$date,
+        mean = apply(df_CF_shape, 1, median),
+        high_90 = apply(df_CF_shape, 1, HDInterval::hdi, credMass = 0.999)[2, ],
+        low_90 = apply(df_CF_shape, 1, HDInterval::hdi, credMass = 0.999)[1, ],
+        high_68 = apply(df_CF_shape, 1, HDInterval::hdi, credMass = 0.68)[2, ],
+        low_68 = apply(df_CF_shape, 1, HDInterval::hdi, credMass = 0.68)[1, ]
+    ) %>%
+    gather(-date, -mean, -high_90, -low_90, -high_68, -low_68, key = "sim", value = "value") %>%
+    filter(sim == "V2")
+
+p <- paletteer::paletteer_d("Redmonder::qPBI")
+
+g1 <- ggplot(df_CF_loc_g) +
+    ggtitle("Location Common Factor") +
+    theme +
+    theme(legend.position = "none") +
+    geom_rect(data = df_recessions, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "black", alpha = 0.2) +
+    xlab("") +
+    ylab("") +
+    geom_ribbon(aes(x = date, y = value, ymin = low_68, ymax = high_68), alpha = 0.5, fill = p[1]) +
+    scale_x_yearmon(format = "%Y", n = 10) +
+    geom_line(aes(x = date, y = mean), alpha = 1, colour = paletteer::paletteer_d("Redmonder::qPBI")[2])
+
+g2 <- ggplot(df_CF_scale_g) +
+    ggtitle("Scale Common Factor") +
+    theme +
+    theme(legend.position = "none") +
+    geom_rect(data = df_recessions, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "black", alpha = 0.2) +
+    xlab("") +
+    ylab("") +
+    geom_ribbon(aes(x = date, y = value, ymin = low_68, ymax = high_68), alpha = 0.5, fill = p[1]) +
+    scale_x_yearmon(format = "%Y", n = 10) +
+    geom_line(aes(x = date, y = mean), alpha = 1, colour = paletteer::paletteer_d("Redmonder::qPBI")[2])
+
+g3 <- ggplot(df_CF_shape_g) +
+    ggtitle("Shape Common Factor") +
+    theme +
+    theme(legend.position = "none") +
+    geom_rect(data = df_recessions, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "black", alpha = 0.2) +
+    xlab("") +
+    ylab("") +
+    geom_ribbon(aes(x = date, y = value, ymin = low_68, ymax = high_68), alpha = 0.5, fill = p[1]) +
+    scale_x_yearmon(format = "%Y", n = 10) +
+    geom_line(aes(x = date, y = mean), alpha = 1, colour = paletteer::paletteer_d("Redmonder::qPBI")[2])
+
+plt <- ggarrange(g1, g2, g3,
+    ncol = 1, nrow = 3,
+    common.legend = TRUE, legend = "right"
+)
+
+ggsave("Figures/fig11.pdf",
+    plot = plt,
+    scale = 1, width = 7, height = 6
+)
+```

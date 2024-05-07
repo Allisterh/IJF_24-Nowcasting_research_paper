@@ -1,0 +1,165 @@
+---
+title: "Real-time recursive estimation of the factor-augmented model"
+format: html
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+source("R/intro.R")
+source("R/sd_dfm.R")
+```
+
+#### 
+```{r, warning=FALSE}
+load("results/monthly_dfm.Rdata")
+```
+
+#### Factor augmented model - loc, scale and shape CF
+```{r, eval = T}
+set.seed(1234)
+
+# LSS, LS, or L model
+model_spec <- "LSS"
+
+list_df_factor <- monthly_dfm[[model_spec]]
+
+df_result <- tibble()
+density_nowcast <- list()
+
+options <- list()
+if (model_spec %in% c("L", "LS", "LSS")) {
+    options$stoch_loc <- T
+} else {
+    options$stoch_loc <- F
+}
+
+if (model_spec %in% c("LS", "LSS")) {
+    options$stoch_vol <- T
+} else {
+    options$stoch_vol <- F
+}
+if (model_spec == "LSS") {
+    options$stoch_shape <- T
+} else {
+    options$stoch_shape <- F
+}
+
+df_result <- c()
+nb_it <- 10
+mle <- list()
+
+for (t_obs in 1:length(list_df_factor)) {
+    outcome <- unique(list_df_factor[[t_obs]]$df$outcome)
+    vintage <- unique(list_df_factor[[t_obs]]$df$vintage)
+
+    GDP_and_factor <- list_df_factor[[t_obs]]$df %>%
+        select(date, GDP, loc_CF, scale_CF, shape_CF) %>%
+        filter(date >= "Feb 1959")
+
+    GDP_and_factor$GDP[2] <- NA
+
+    y <- GDP_and_factor$GDP[!is.na(GDP_and_factor$GDP)]
+
+    model <- list(
+        y = y,
+        options = options,
+        NAs = c(0, which(is.na(y)))
+    )
+
+    if (options$stoch_loc) {
+        model$X_loc <- GDP_and_factor$loc_CF
+    } else {
+        model$X_loc <- 0
+    }
+
+    if (options$stoch_vol) {
+        model$X_scale <- GDP_and_factor$scale_CF
+    } else {
+        model$X_scale <- 0
+    }
+
+    if (options$stoch_shape) {
+        model$X_shape <- GDP_and_factor$shape_CF
+    } else {
+        model$X_shape <- 0
+    }
+
+    if (month(vintage) %in% c(1, 4, 7, 10)) {
+        step <- 0
+    }
+
+    if (month(vintage) %in% c(2, 5, 8, 11)) {
+        step <- 2
+    }
+
+    if (month(vintage) %in% c(3, 6, 9, 12)) {
+        step <- 1
+    }
+
+    mle <- estimation_reg(model, nb_it)
+
+    if (nrow(t(list_df_factor[[t_obs]]$simulated_factors$location_CF)) == 1) {
+        print_colour("step 0", "cyan")
+        model$y <- c(y, NA)
+        model$NAs <- c(0, which(is.na(model$y)))
+        N1 <- length(model$y)
+
+        Predic <- loglik_reg_list(mle$MLE$par, model)
+
+        data_t <- rSkt(1e4, c(
+            Predic$scale[N1],
+            Predic$model$parameters[2],
+            Predic$model$parameters[2],
+            Predic$shape[N1]
+        )) + Predic$location[N1]
+
+        density_t <- density(data_t)
+        density_nowcast[[t_obs]] <- density_t
+
+        log_score <- log(Skt_f(t(c(
+            outcome - Predic$location[N1],
+            Predic$scale[N1],
+            Predic$model$parameters[2],
+            Predic$model$parameters[2],
+            Predic$shape[N1]
+        ))))
+    } else {
+        data_t <- simulation_FA_LSS(
+            mle$MLE$par, model,
+            list_df_factor[[t_obs]]$simulated_factors
+        )
+        data_t <- data_t[!is.na(data_t)]
+
+        density_t <- density(data_t)
+        density_nowcast[[t_obs]] <- density_t
+
+        log_score <- logscore_function(density_t, outcome)
+    }
+
+    HDI <- hdi(data_t, credMass = 0.68)
+
+    df_result %<>% rbind(tibble(
+        log_score = log_score,
+        CRPS = crps_sample(y = outcome, dat = data_t),
+        SQE = (mean(data_t) - outcome)^2,
+        conditional_mean = mean(data_t),
+        HDI_low = HDI[1],
+        HDI_high = HDI[2],
+        PIT = pit_function(density_t, outcome),
+        outcome = outcome,
+        vintage = vintage,
+        step = step
+    ))
+
+    show(vintage)
+}
+
+list_result <- list(
+    df_result = df_result,
+    density_nowcast = density_nowcast
+)
+
+load("results/FactorAugmented.Rdata")
+FactorAugmented[[model_spec]] <- list_result
+save(FactorAugmented, file = "results/FactorAugmented.Rdata", compress = "xz")
+```
+

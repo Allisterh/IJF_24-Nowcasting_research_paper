@@ -1,0 +1,75 @@
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+source("R/intro.R")
+source("R/sd_dfm.R")
+```
+
+#### FRED MD
+```{r, warning=FALSE}
+load("data/vintages.Rdata")
+```
+
+#### AR2 model
+```{r}
+df_result <- tibble()
+density_nowcast <- list()
+estim <- list()
+
+spec <- list()
+spec$dist <- "Student"
+AR_2_results <- list()
+
+t_obs <- 0
+for (vintage in 1:length(list_vintages)) {
+    if (list_vintages[[vintage]]$vintage > "Jan 2007") {
+        if (month(list_vintages[[vintage]]$vintage) %in% c(1, 4, 7, 10)) {
+            t_obs <- t_obs + 1
+
+            df <- list_vintages[[vintage]]$df_rolling_quarterly %>%
+                filter(!is.na(GDP)) %>%
+                select(date, GDP)
+
+            y <- unlist(df[, -1])
+
+            model <- list(
+                y = y,
+                spec = spec
+            )
+
+            outcome <- list_vintages[[vintage]]$target_gdp_figure
+
+            estim <- estimation_AR2(model, nb_it = 10)
+
+            AR_pred <- estim$pred
+
+            data_t <- as.vector(rSkt(1e6, t(c(AR_pred$scale, AR_pred$nu, AR_pred$nu, 0))) + AR_pred$y_pred[AR_pred$N])
+
+            density_t <- density(data_t)
+            density_nowcast[[t_obs]] <- density_t
+            HDI <- hdi(data_t, credMass = 0.68)
+
+            df_result %<>% rbind(tibble(
+                log_score = log(Skt_f(t(c(outcome - AR_pred$y[AR_pred$N], AR_pred$scale, AR_pred$nu, AR_pred$nu, 0)))),
+                CRPS = crps_sample(y = outcome, dat = as.vector(data_t)),
+                SQE = (mean(data_t) - outcome)^2,
+                PIT = pit_function(density_t, outcome),
+                conditional_mean = AR_pred$y[AR_pred$N], # since the distribution is not skewed the conditional mean equals the location
+                HDI_low = HDI[1],
+                HDI_high = HDI[2],
+                outcome = outcome,
+                vintage = list_vintages[[vintage]]$vintage_date
+            ))
+
+            plot(density_nowcast[[t_obs]], main = list_vintages[[vintage]]$vintage_date)
+            abline(v = outcome)
+        }
+    }
+}
+
+AR_2_results$Student <- list(
+    df_result = df_result,
+    density_nowcast = density_nowcast,
+    spec = spec
+)
+
+save(AR_2_results, file = "Results/AR2.Rdata")
+```

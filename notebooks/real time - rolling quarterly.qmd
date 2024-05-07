@@ -1,0 +1,135 @@
+---
+title: "Real-time recursive estimation of the rolling quarterly model"
+format: html
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+source("R/intro.R")
+source("R/sd_dfm.R")
+```
+
+#### FRED MD
+```{r, warning=FALSE}
+## Selected variables (headline variables as in Banbura (handbook ECB working paper))
+selection_var <- c(
+    "RPI", "INDPRO", "CUMFNS", # group 1 : manufacturing #RPI
+    "CE16OV", "UNRATE", "PAYEMS", # group 2 : labor
+    "DPCERA3M086SBEA", "RETAILx", "UMCSENTx",
+    "S&P 500",
+    "GDP"
+)
+
+load("data/vintages.Rdata")
+```
+
+#### Rolling estimation
+```{r}
+# LSS, LS, or L model
+spec <- "LSS"
+
+out_of_sample_stats <- list()
+j <- 1
+df_result <- tibble()
+df_factor_loading <- c()
+mle_pars <- list()
+list_esti <- list()
+
+for (vintage in 1:length(list_vintages)) {
+    if (list_vintages[[vintage]]$vintage >= "Feb 2007") {
+        set.seed(1234)
+
+        show(list_vintages[[vintage]]$vintage)
+
+        df <- list_vintages[[vintage]]$df_rolling_quarterly %>%
+            gather(-date, key = "var", value = "values") %>%
+            filter(
+                date >= "Apr 1959",
+                date <= "Dec 2023"
+            ) %>%
+            filter(var %in% selection_var) %>%
+            spread(key = "var", value = "values") %>%
+            relocate(date, GDP, INDPRO)
+
+        y <- as.matrix(df[, -1])
+        y <- rbind(
+            y,
+            matrix(
+                NA,
+                which(y[, 1] == last(y[!is.na(y[, 1]), 1])) + 3 - nrow(y), ncol(y)
+            )
+        )
+
+        init_par <- NULL
+        qt <- yearqtr(list_vintages[[vintage]]$vintage - 1 / 12)
+        if (qt %in% "2020 Q3" & spec == "LSS") {
+            init_par <- MLE$par
+        }
+
+        esti <- seq_esti(y, init_par = init_par, nb_it = 50, spec, mix = F)
+
+        MLE_model <- esti
+        model <- MLE_model$model
+
+        MLE <- MLE_model$MLE
+        filter_result <- MLE_model$filter_result
+        mle_pars[[paste0(colnames(y), collapse = "")]] <- MLE$par
+        list_esti[[j]] <- MLE_model
+        loc_CF <- filter_result$a_f[ncol(y) * 5 + 1, model$N]
+        scale_CF <- filter_result$a_scale_f[ncol(y) + 1, model$N]
+        shape_CF <- filter_result$a_shape_f[ncol(y) + 1, model$N]
+
+        outcome <- list_vintages[[vintage]]$target_gdp_figure
+
+        out_of_sample_stats[[j]] <- out_of_sample_evaluation(filter_result, model, outcome)
+        out_of_sample_stats[[j]]$vintage <- list_vintages[[vintage]]$vintage
+
+        df_result %<>% rbind(tibble(
+            log_score = out_of_sample_stats[[j]]$log_score,
+            CRPS = out_of_sample_stats[[j]]$CRPS,
+            SQE = out_of_sample_stats[[j]]$sq_error,
+            PIT = out_of_sample_stats[[j]]$PIT,
+            conditional_mean = out_of_sample_stats[[j]]$condi_mean,
+            HDI_low = out_of_sample_stats[[j]]$HDI_low,
+            HDI_high = out_of_sample_stats[[j]]$HDI_high,
+            outcome = outcome,
+            vintage = out_of_sample_stats[[j]]$vintage,
+            loc_CF = loc_CF,
+            scale_CF = scale_CF,
+            shape_CF = shape_CF,
+            step = out_of_sample_stats[[j]]$steps
+        ))
+
+        #### Factor loadings
+        df_factor_loading_t <- cbind(
+            FL_loc = MLE$par[filter_result$model$index_loc],
+            FL_scale = MLE$par[filter_result$model$index_scale],
+            FL_shape = MLE$par[filter_result$model$index_shape],
+            period = j,
+            series_label = colnames(y)[-1]
+        )
+
+        df_factor_loading %<>% rbind(df_factor_loading_t)
+
+        j <- j + 1
+    }
+}
+
+df_result %<>%
+    mutate(
+        step = ifelse(month(vintage) %in% c(2, 5, 8, 11), 2, step),
+        step = ifelse(month(vintage) %in% c(3, 6, 9, 12), 1, step),
+        step = ifelse(month(vintage) %in% c(4, 7, 10, 1), 0, step)
+    )
+
+### saving
+scoredriven_dfm_results <- list()
+scoredriven_dfm_results$out_of_sample_stats <- out_of_sample_stats
+scoredriven_dfm_results$df_result <- df_result
+scoredriven_dfm_results$list_esti <- list_esti
+scoredriven_dfm_results$df_factor_loading <- df_factor_loading
+scoredriven_dfm_results$vintage <- list_vintages[[vintage]]$vintage
+#
+load("results/scoredriven_dfm.Rdata")
+scoredriven_dfm[[spec]] <- scoredriven_dfm_results
+save(scoredriven_dfm, file = "results/scoredriven_dfm.Rdata", compress = "xz")
+```

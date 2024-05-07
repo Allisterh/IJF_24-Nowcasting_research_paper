@@ -1,0 +1,192 @@
+---
+title: "Building the fred vintages ready for estimation from the Fred-MD csv sources"
+format: html
+---
+
+```{r}
+source("R/intro.R")
+source("R/sd_dfm.R")
+# the fbi package is needed but not available on CRAN
+devtools::install_github("cykbennie/fbi")
+library(fbi)
+```
+
+#### NBER Recessions
+```{r}
+df_recessions <- read.table(
+    textConnection(
+        "Peak, Trough
+1973-11-01, 1975-03-01
+1980-01-01, 1980-07-01
+1981-07-01, 1982-11-01
+1990-07-01, 1991-03-01
+2001-03-01, 2001-11-01
+2007-12-01, 2009-06-01,
+2020-02-01, 2020-06-01"
+    ),
+    sep = ",",
+    colClasses = c("Date", "Date"), header = TRUE
+)
+
+df_recessions %<>%
+    mutate(
+        Peak = as.yearmon(Peak),
+        Trough = as.yearmon(Trough)
+    )
+```
+
+#### Loading the first release of GDP over time
+```{r}
+df_first_release <- as_tibble(read_xlsx("data/source fred/routput_first_second_third.xlsx", sheet = 2, skip = 4)) %>%
+    mutate(
+        Date = as.yearqtr(Date, "%Y:Q%q"),
+        First = (as.numeric(First) / 100 + 1)^(1 / 4) - 1,
+        First = First * 100,
+        Second = (as.numeric(Second) / 100 + 1)^(1 / 4) - 1,
+        Second = Second * 100,
+        Third = (as.numeric(Third) / 100 + 1)^(1 / 4) - 1,
+        Third = Third * 100,
+        Most_Recent = (as.numeric(Most_Recent) / 100 + 1)^(1 / 4) - 1,
+        Most_Recent = Most_Recent * 100
+    )
+
+df_first_release$Second[which(is.na(df_first_release$Second))] <- df_first_release$First[which(is.na(df_first_release$Second))]
+df_first_release$Third[which(is.na(df_first_release$Third))] <- df_first_release$Second[which(is.na(df_first_release$Third))]
+```
+
+#### Vintages
+```{r, warning=FALSE}
+list_vintages <- list()
+
+vintages_csv_files <- list.files("data/source fred", pattern = "*.csv", full.names = TRUE)
+
+df_GDP <- as_tibble(read_xlsx("data/source fred/routputMvQd.xlsx")) %>%
+    mutate(
+        DATE = str_replace(DATE, ":", " "),
+        date = as.yearqtr(DATE)
+    ) %>%
+    select(-DATE) %>%
+    gather(-date, key = "vintage", value = "value") %>%
+    mutate(
+        vintage = str_sub(vintage, start = 8),
+        vintage = paste0(str_sub(vintage, start = 1, end = 2), " ", str_sub(vintage, start = 4)),
+        year = as.numeric(str_sub(vintage, start = 1, end = 2)),
+        month = as.numeric(str_sub(vintage, start = 4)),
+        vintage = as.yearmon(vintage, "%y %m"),
+        value = ifelse(vintage == "Dec 2003" & date == "2003 Q3", 10493.1, value)
+    ) %>% #- 1/12
+    filter(!(year %in% c(65:68))) %>%
+    select(-year, -month)
+
+i <- 1
+
+for (file_i in vintages_csv_files) {
+    vintage_date <- str_sub(file_i, start = -11)
+    vintage_date <- as.yearmon(substring(vintage_date, 1, 7))
+
+    df_GDP_i <- filter(df_GDP, vintage == vintage_date) %>%
+        mutate(
+            value = as.numeric(value),
+            GDP = (value - lag(value)) / lag(value) * 100,
+            quarter = quarter(date),
+            year = year(date)
+        ) %>%
+        select(-date, -vintage, -value)
+
+    ## Dropping claims if release before 2014 because NSA
+    excluded_variables_i <- c()
+    if (vintage_date < "Jul 2015") {
+        excluded_variables_i <- c(excluded_variables_i, "CLAIMSx")
+    }
+
+    df_vintage_i <- fredmd(file_i)
+
+    ### Monthly dataset
+    df_fredMD_i <- as_tibble(fredmd(file_i)) %>%
+        mutate(
+            date = as.yearmon(date),
+            quarter = quarter(date),
+            year = year(date)
+        ) %>%
+        gather(-date, -quarter, -year, key = "var", value = "values") %>%
+        filter(!(var %in% excluded_variables_i)) %>%
+        spread(key = "var", value = "values")
+
+    col_to_exclude <- c()
+    for (col in 1:ncol(df_fredMD_i)) {
+        if (nrow(df_fredMD_i[!is.na(df_fredMD_i[, col]), col]) < 50) {
+            show(list(colnames(df_fredMD_i)[col], vintage_date))
+            col_to_exclude <- c(col, col_to_exclude)
+        }
+    }
+
+    if (length(col_to_exclude) > 0) {
+        df_fredMD_i <- df_fredMD_i[, -col_to_exclude]
+    }
+
+    df_i <- df_fredMD_i %>%
+        left_join(df_GDP_i, by = c("year" = "year", "quarter" = "quarter")) %>%
+        mutate(
+            month = month(date),
+            GDP = ifelse(month %in% c(1, 2, 4, 5, 7, 8, 10, 11), NA, GDP)
+        ) %>%
+        select(-year, -quarter, -month) %>%
+        relocate(date, GDP)
+
+    ### Rolling quarterly dataset
+    df_fredMD_i_rolling_quarterly <- as_tibble(fredmd(file_i)) %>%
+        mutate(
+            date = as.yearmon(date),
+            quarter = quarter(date),
+            year = year(date)
+        ) %>%
+        gather(-date, -quarter, -year, key = "var", value = "values") %>%
+        filter(!(var %in% excluded_variables_i)) %>%
+        group_by(var) %>%
+        mutate(values = 1 / 3 * values + 2 / 3 * lag(values) + lag(values, 2) + 2 / 3 * lag(values, 3) + 1 / 3 * lag(values, 4)) %>%
+        ungroup() %>%
+        spread(key = "var", value = "values")
+
+    col_to_exclude <- c()
+    for (col in 1:ncol(df_fredMD_i_rolling_quarterly)) {
+        if (nrow(df_fredMD_i_rolling_quarterly[!is.na(df_fredMD_i_rolling_quarterly[, col]), col]) < 50) {
+            show(list(colnames(df_fredMD_i_rolling_quarterly)[col], vintage_date))
+            col_to_exclude <- c(col, col_to_exclude)
+        }
+    }
+
+    if (length(col_to_exclude) > 0) {
+        df_fredMD_i_rolling_quarterly <- df_fredMD_i_rolling_quarterly[, -col_to_exclude]
+    }
+
+    df_i_roll_q <- df_fredMD_i_rolling_quarterly %>%
+        left_join(df_GDP_i, by = c("year" = "year", "quarter" = "quarter")) %>%
+        mutate(
+            month = month(date),
+            GDP = ifelse(month %in% c(1, 2, 4, 5, 7, 8, 10, 11), NA, GDP)
+        ) %>%
+        select(-year, -quarter, -month) %>%
+        relocate(date, GDP, INDPRO)
+
+    date_last_available_gdp_for_estimation <- yearqtr(df_i$date[last(which(!is.na(df_i$GDP)))])
+    target_gdp_figure <- df_first_release$First[df_first_release$Date == date_last_available_gdp_for_estimation + 1 / 4]
+    second_release <- df_first_release$Second[df_first_release$Date == date_last_available_gdp_for_estimation + 1 / 4]
+    third_release <- df_first_release$Third[df_first_release$Date == date_last_available_gdp_for_estimation + 1 / 4]
+
+    if (length(target_gdp_figure) > 0) {
+        list_vintages[[i]] <- list(
+            df = df_i,
+            df_rolling_quarterly = df_i_roll_q,
+            vintage_date = vintage_date,
+            target_gdp_figure = target_gdp_figure,
+            second_release = second_release,
+            third_release = third_release
+        )
+        i <- i + 1
+    } else {
+        show(vintage_date)
+    }
+}
+
+save(list_vintages,df_recessions, file="data/vintages.Rdata", compress = "xz")
+```

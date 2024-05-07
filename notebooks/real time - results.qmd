@@ -1,0 +1,1188 @@
+---
+title: "Result analysis"
+format: html
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
+source("R/intro.R")
+source("R/sd_dfm.R")
+```
+
+#### Loading results
+```{r}
+load("results/FactorAugmented.Rdata")
+load("results/AR2.Rdata")
+load("results/scoredriven_dfm.Rdata")
+load("data/vintages.Rdata")
+```
+
+### Table 1
+```{r, eval=T}
+df_test <- c()
+
+FA_LSS_0 <- c("LSS", 0, calibration_tests(filter(FactorAugmented$LSS$df_result, step == 0)$PIT))
+FA_LSS_1 <- c("LSS", 1, calibration_tests(filter(FactorAugmented$LSS$df_result, step == 1)$PIT))
+FA_LSS_2 <- c("LSS", 2, calibration_tests(filter(FactorAugmented$LSS$df_result, step == 2)$PIT))
+
+FA_LS_0 <- c("LS", 0, calibration_tests(filter(FactorAugmented$LS$df_result, step == 0)$PIT))
+FA_LS_1 <- c("LS", 1, calibration_tests(filter(FactorAugmented$LS$df_result, step == 1)$PIT))
+FA_LS_2 <- c("LS", 2, calibration_tests(filter(FactorAugmented$LS$df_result, step == 2)$PIT))
+
+FA_L_0 <- c("L", 0, calibration_tests(filter(FactorAugmented$L$df_result, step == 0)$PIT))
+FA_L_1 <- c("L", 1, calibration_tests(filter(FactorAugmented$L$df_result, step == 1)$PIT))
+FA_L_2 <- c("L", 2, calibration_tests(filter(FactorAugmented$L$df_result, step == 2)$PIT))
+
+test_names <- c("AD", "LB", "BT")
+DFM_LSS_0 <- c("LSS", 0, calibration_tests(filter(scoredriven_dfm$LSS$df_result, step == 0)$PIT))
+DFM_LSS_1 <- c("LSS", 1, calibration_tests(filter(scoredriven_dfm$LSS$df_result, step == 1)$PIT))
+DFM_LSS_2 <- c("LSS", 2, calibration_tests(filter(scoredriven_dfm$LSS$df_result, step == 2)$PIT))
+
+DFM_LS_0 <- c("LS", 0, calibration_tests(filter(scoredriven_dfm$LS$df_result, step == 0)$PIT))
+DFM_LS_1 <- c("LS", 1, calibration_tests(filter(scoredriven_dfm$LS$df_result, step == 1)$PIT))
+DFM_LS_2 <- c("LS", 2, calibration_tests(filter(scoredriven_dfm$LS$df_result, step == 2)$PIT))
+
+DFM_L_0 <- c("L", 0, calibration_tests(filter(scoredriven_dfm$L$df_result, step == 0)$PIT))
+DFM_L_1 <- c("L", 1, calibration_tests(filter(scoredriven_dfm$L$df_result, step == 1)$PIT))
+DFM_L_2 <- c("L", 2, calibration_tests(filter(scoredriven_dfm$L$df_result, step == 2)$PIT))
+
+AR <- c("none", "1,2,3", calibration_tests(AR_2_results$Student$df_result$PIT))
+
+table_test <- as_tibble(cbind(
+    c(
+        rep("FA", 9),
+        rep("DFM", 9),
+        "AR2"
+    ),
+    rbind(
+        FA_LSS_0, FA_LSS_1, FA_LSS_2,
+        FA_LS_0, FA_LS_1, FA_LS_2,
+        FA_L_0, FA_L_1, FA_L_2,
+        DFM_LSS_0, DFM_LSS_1, DFM_LSS_2,
+        DFM_LS_0, DFM_LS_1, DFM_LS_2,
+        DFM_L_0, DFM_L_1, DFM_L_2,
+        AR
+    )
+))
+
+stargazer(table_test[, -1], summary = FALSE, rownames = FALSE, colnames = F)
+```
+
+### Calibration graphs
+#### Calibration graphs AR2
+```{r}
+df_pits <- AR_2_results$Student$df_result$PIT
+
+pdf(
+    file = "Figures/fig3.pdf",
+    width = 8,
+    height = 1.5
+)
+layout(t(c(1, 2)))
+par(mai = c(0.3, 0.3, 0.3, 0.3), cex = 0.8)
+title_add <- "Student's t AR(2)"
+Dielbolt_test(df_pits, step = "", title_add = title_add)
+Rossi_test(df_pits, step = "")
+dev.off()
+```
+
+#### Calibration graphs DFM
+```{r}
+p <- as.vector(unlist(pal_unikn_pref))[2]
+
+results_to_analyse <- list()
+results_to_analyse[[1]] <- scoredriven_dfm$L
+results_to_analyse[[2]] <- scoredriven_dfm$LS
+results_to_analyse[[3]] <- scoredriven_dfm$LSS
+
+df_pits <- rbind(
+    filter(results_to_analyse[[1]]$df_result, step == 0)$PIT,
+    filter(results_to_analyse[[1]]$df_result, step == 1)$PIT,
+    filter(results_to_analyse[[1]]$df_result, step == 2)$PIT,
+    filter(results_to_analyse[[2]]$df_result, step == 0)$PIT,
+    filter(results_to_analyse[[2]]$df_result, step == 1)$PIT,
+    filter(results_to_analyse[[2]]$df_result, step == 2)$PIT,
+    filter(results_to_analyse[[3]]$df_result, step == 0)$PIT,
+    filter(results_to_analyse[[3]]$df_result, step == 1)$PIT,
+    filter(results_to_analyse[[3]]$df_result, step == 2)$PIT
+)
+pdf(
+    file = "Figures/fig4.pdf",
+    width = 7,
+    height = 9.5
+)
+layout(rbind(
+    1:3,
+    4:6,
+    7:9,
+    10:12,
+    13:15,
+    16:18
+))
+par(mai = c(0.3, 0.3, 0.3, 0.3), cex = 0.7)
+title_add <- "With location common factor (CF)"
+Dielbolt_test(df_pits[1, ], 0, title_add)
+Dielbolt_test(df_pits[2, ], 1, title_add)
+Dielbolt_test(df_pits[3, ], 2, title_add)
+
+Rossi_test(df_pits[1, ], 0)
+Rossi_test(df_pits[2, ], 1)
+Rossi_test(df_pits[3, ], 2)
+
+title_add <- "With location & scale CFs"
+Dielbolt_test(df_pits[4, ], 0, title_add)
+Dielbolt_test(df_pits[5, ], 1, title_add)
+Dielbolt_test(df_pits[6, ], 2, title_add)
+
+Rossi_test(df_pits[4, ], 0)
+Rossi_test(df_pits[5, ], 1)
+Rossi_test(df_pits[6, ], 2)
+
+title_add <- "With location, scale & shape CFs"
+Dielbolt_test(df_pits[7, ], 0, title_add)
+Dielbolt_test(df_pits[8, ], 1, title_add)
+Dielbolt_test(df_pits[9, ], 2, title_add)
+
+Rossi_test(df_pits[7, ], 0)
+Rossi_test(df_pits[8, ], 1)
+Rossi_test(df_pits[9, ], 2)
+dev.off()
+```
+
+#### Calibration graphs FA
+```{r}
+p <- as.vector(unlist(pal_unikn_pref))[2]
+
+results_to_analyse <- list()
+results_to_analyse[[1]] <- FactorAugmented$L
+results_to_analyse[[2]] <- FactorAugmented$LS
+results_to_analyse[[3]] <- FactorAugmented$LSS
+
+df_pits <- rbind(
+    filter(results_to_analyse[[1]]$df_result, step == 0)$PIT,
+    filter(results_to_analyse[[1]]$df_result, step == 1)$PIT,
+    filter(results_to_analyse[[1]]$df_result, step == 2)$PIT,
+    filter(results_to_analyse[[2]]$df_result, step == 0)$PIT,
+    filter(results_to_analyse[[2]]$df_result, step == 1)$PIT,
+    filter(results_to_analyse[[2]]$df_result, step == 2)$PIT,
+    filter(results_to_analyse[[3]]$df_result, step == 0)$PIT,
+    filter(results_to_analyse[[3]]$df_result, step == 1)$PIT,
+    filter(results_to_analyse[[3]]$df_result, step == 2)$PIT
+)
+pdf(
+    file = "Figures/fig5.pdf",
+    width = 7,
+    height = 9.5
+)
+layout(rbind(
+    1:3,
+    4:6,
+    7:9,
+    10:12,
+    13:15,
+    16:18
+))
+par(mai = c(0.3, 0.3, 0.3, 0.3), cex = 0.7)
+title_add <- "With location common factor (CF)"
+Dielbolt_test(df_pits[1, ], 0, title_add)
+Dielbolt_test(df_pits[2, ], 1, title_add)
+Dielbolt_test(df_pits[3, ], 2, title_add)
+
+Rossi_test(df_pits[1, ], 0)
+Rossi_test(df_pits[2, ], 1)
+Rossi_test(df_pits[3, ], 2)
+
+title_add <- "With location & scale CFs"
+Dielbolt_test(df_pits[4, ], 0, title_add)
+Dielbolt_test(df_pits[5, ], 1, title_add)
+Dielbolt_test(df_pits[6, ], 2, title_add)
+
+Rossi_test(df_pits[4, ], 0)
+Rossi_test(df_pits[5, ], 1)
+Rossi_test(df_pits[6, ], 2)
+
+title_add <- "With location, scale & shape CFs"
+Dielbolt_test(df_pits[7, ], 0, title_add)
+Dielbolt_test(df_pits[8, ], 1, title_add)
+Dielbolt_test(df_pits[9, ], 2, title_add)
+
+Rossi_test(df_pits[7, ], 0)
+Rossi_test(df_pits[8, ], 1)
+Rossi_test(df_pits[9, ], 2)
+dev.off()
+```
+
+### Start of table 2 computation
+#### log scores
+```{r}
+#### AR2
+df_AR2 <- AR_2_results$Student$df_result %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Student's t AR2",
+        `Common factor` = "No common factor",
+        `0` = log_score,
+        `1` = log_score,
+        `2` = log_score
+    ) %>%
+    select(-log_score)
+
+#### FA
+df_FA_L <- FactorAugmented$L$df_result %>%
+    group_by(step) %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Factor Augmented MIDAS",
+        `Common factor` = "Location"
+    )
+
+df_FA_LS <- FactorAugmented$LS$df_result %>%
+    group_by(step) %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Factor Augmented MIDAS",
+        `Common factor` = "Location and Scale"
+    )
+
+df_FA_LSS <- FactorAugmented$LSS$df_result %>%
+    group_by(step) %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Factor Augmented MIDAS",
+        `Common factor` = "Location, Scale and Shape"
+    )
+
+df_FA <- rbind(df_FA_LSS, df_FA_LS, df_FA_L) %>%
+    spread(key = step, value = log_score)
+
+#### DFM
+df_DFM_L <- scoredriven_dfm$L$df_result %>%
+    group_by(step) %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Mixed-Frequency Factor Model",
+        `Common factor` = "Location"
+    )
+
+df_DFM_LS <- scoredriven_dfm$LS$df_result %>%
+    group_by(step) %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Mixed-Frequency Factor Model",
+        `Common factor` = "Location and Scale"
+    )
+
+df_DFM_LSS <- scoredriven_dfm$LSS$df_result %>%
+    group_by(step) %>%
+    summarise(log_score = mean(log_score)) %>%
+    mutate(
+        model = "Mixed-Frequency Factor Model",
+        `Common factor` = "Location, Scale and Shape"
+    )
+
+df_DFM <- rbind(df_DFM_LSS, df_DFM_LS, df_DFM_L) %>%
+    spread(key = step, value = log_score)
+
+df_logscore <- rbind(df_AR2, df_FA, df_DFM)
+df_logscore <- cbind(df_logscore, apply(df_logscore[, -c(1, 2)], 1, mean))
+df_logscore <- df_logscore[, c(1, 2, 5, 4, 3, 6)]
+colnames(df_logscore)[6] <- "mean"
+```
+
+#### CRPS
+```{r}
+#### AR2
+df_AR2 <- AR_2_results$Student$df_result %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Student's t AR2",
+        `Common factor` = "No common factor",
+        `0` = CRPS,
+        `1` = CRPS,
+        `2` = CRPS
+    ) %>%
+    select(-CRPS)
+
+#### FA
+df_FA_L <- FactorAugmented$L$df_result %>%
+    group_by(step) %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Factor Augmented MIDAS",
+        `Common factor` = "Location"
+    )
+
+df_FA_LS <- FactorAugmented$LS$df_result %>%
+    group_by(step) %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Factor Augmented MIDAS",
+        `Common factor` = "Location and Scale"
+    )
+
+df_FA_LSS <- FactorAugmented$LSS$df_result %>%
+    group_by(step) %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Factor Augmented MIDAS",
+        `Common factor` = "Location, Scale and Shape"
+    )
+
+df_FA <- rbind(df_FA_LSS, df_FA_LS, df_FA_L) %>%
+    spread(key = step, value = CRPS)
+
+#### DFM
+df_DFM_L <- scoredriven_dfm$L$df_result %>%
+    group_by(step) %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Mixed-Frequency Factor Model",
+        `Common factor` = "Location"
+    )
+
+df_DFM_LS <- scoredriven_dfm$LS$df_result %>%
+    group_by(step) %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Mixed-Frequency Factor Model",
+        `Common factor` = "Location and Scale"
+    )
+
+df_DFM_LSS <- scoredriven_dfm$LSS$df_result %>%
+    group_by(step) %>%
+    summarise(CRPS = mean(CRPS)) %>%
+    mutate(
+        model = "Mixed-Frequency Factor Model",
+        `Common factor` = "Location, Scale and Shape"
+    )
+
+df_DFM <- rbind(df_DFM_LSS, df_DFM_LS, df_DFM_L) %>%
+    spread(key = step, value = CRPS)
+
+df_CRPS <- rbind(df_AR2, df_FA, df_DFM)
+df_CRPS <- cbind(df_CRPS, apply(df_CRPS[, -c(1, 2)], 1, mean))
+df_CRPS <- df_CRPS[, c(1, 2, 5, 4, 3, 6)]
+# colnames(df_CRPS)[c(3,4,5)] = c("2", "1", "0")
+colnames(df_CRPS)[6] <- "mean"
+```
+
+#### relative stats
+```{r}
+# logscore
+df_logscore <- rbind(df_logscore[1:4, ], df_logscore[1, ], df_logscore[5:7, ])
+df_logscore_r <- df_logscore
+for (i in 1:4) {
+    for (j in 3:6) {
+        df_logscore_r[i, j] <- df_logscore_r[i, j] / df_logscore[2, j]
+    }
+}
+for (i in 5:8) {
+    for (j in 3:6) {
+        df_logscore_r[i, j] <- df_logscore_r[i, j] / df_logscore[6, j]
+    }
+}
+df_logscore_r <- df_logscore_r[-c(2, 6), ]
+df_logscore_r <- as_tibble(df_logscore_r) %>%
+    mutate(
+        stat = "log_score",
+        type = 1
+    )
+df_logscore_r[1, 1] <- "Factor Augmented MIDAS"
+df_logscore_r[4, 1] <- "Mixed-Frequency Factor Model"
+
+# crps
+df_CRPS <- rbind(df_CRPS[1:4, ], df_CRPS[1, ], df_CRPS[5:7, ])
+df_CRPS_r <- df_CRPS
+for (i in 1:4) {
+    for (j in 3:6) {
+        df_CRPS_r[i, j] <- df_CRPS_r[i, j] / df_CRPS[2, j]
+    }
+}
+for (i in 5:8) {
+    for (j in 3:6) {
+        df_CRPS_r[i, j] <- df_CRPS_r[i, j] / df_CRPS[6, j]
+    }
+}
+df_CRPS_r <- df_CRPS_r[-c(2, 6), ]
+df_CRPS_r <- as_tibble(df_CRPS_r) %>%
+    mutate(
+        stat = "CRPS",
+        type = 1
+    )
+df_CRPS_r[1, 1] <- "Factor Augmented MIDAS"
+df_CRPS_r[4, 1] <- "Mixed-Frequency Factor Model"
+```
+
+#### DM test
+```{r}
+df_DM <- c()
+
+AR_2_results[["Student"]]$df_result %<>%
+    mutate(MAE = sqrt(SQE))
+
+for (model in c("L", "LS", "LSS")) {
+    FactorAugmented[[model]]$df_result %<>%
+        mutate(MAE = sqrt(SQE))
+
+    scoredriven_dfm[[model]]$df_result %<>%
+        mutate(MAE = sqrt(SQE))
+}
+
+for (stat in c("log_score", "CRPS")) {
+    df_tests <- as.data.frame(matrix(NA, 6, 5))
+    df_tests[, 1] <- c(
+        "Factor Augmented MIDAS", "Factor Augmented MIDAS", "Factor Augmented MIDAS",
+        "Mixed-Frequency Factor Model", "Mixed-Frequency Factor Model", "Mixed-Frequency Factor Model"
+    )
+    df_tests[, 2] <- c(
+        "No common factor", "Location and Scale", "Location, Scale and Shape
+",
+        "No common factor", "Location and Scale", "Location, Scale and Shape
+"
+    )
+    i <- 1
+    for (model in c("LS", "LSS")) {
+        for (h in 0:2) {
+            # AR2 dfm
+            e1 <- filter(
+                AR_2_results[["Student"]]$df_result,
+                vintage <= "Jan 2025"
+            )[[stat]]
+            e2 <- filter(
+                scoredriven_dfm[["L"]]$df_result,
+                step == h, vintage <= "Jan 2025"
+            )[[stat]]
+            if (stat == "log_score") {
+                e1 <- -e1
+                e2 <- -e2
+            }
+            df_tests[1, h + 3] <- dm_test(e1, e2, alternative = "two.sided", h = 1)$statistic
+
+            # AR2 fa
+            e1 <- filter(
+                AR_2_results[["Student"]]$df_result,
+                vintage <= "Jan 2025"
+            )[[stat]]
+            e2 <- filter(
+                FactorAugmented[["L"]]$df_result,
+                step == h, vintage <= "Jan 2025"
+            )[[stat]]
+            if (stat == "log_score") {
+                e1 <- -e1
+                e2 <- -e2
+            }
+            df_tests[4, h + 3] <- dm_test(e1, e2, alternative = "two.sided", h = 1)$statistic
+
+            # fa
+            e1 <- filter(
+                FactorAugmented[[model]]$df_result,
+                step == h, vintage <= "Jan 2025"
+            )[[stat]]
+            e2 <- filter(
+                FactorAugmented[["L"]]$df_result,
+                step == h, vintage <= "Jan 2025"
+            )[[stat]]
+            if (stat == "log_score") {
+                e1 <- -e1
+                e2 <- -e2
+            }
+            df_tests[i + 1, h + 3] <- dm_test(e1, e2, alternative = "two.sided", h = 1)$statistic
+
+            # dfm
+            e1 <- filter(
+                scoredriven_dfm[[model]]$df_result,
+                step == h, vintage <= "Jan 2025"
+            )[[stat]]
+            e2 <- filter(
+                scoredriven_dfm[["L"]]$df_result,
+                step == h, vintage <= "Jan 2025"
+            )[[stat]]
+            if (stat == "log_score") {
+                e1 <- -e1
+                e2 <- -e2
+            }
+            df_tests[i + 4, h + 3] <- dm_test(e1, e2, alternative = "two.sided", h = 1)$statistic
+        }
+        i <- i + 1
+    }
+
+    df_tests %<>%
+        mutate(stat = stat)
+
+    df_DM <- rbind(df_DM, df_tests)
+}
+colnames(df_DM) <- c("model", "Common factor", "0", "1", "2", "stat")
+df_DM <- as_tibble(df_DM) %>%
+    mutate(
+        mean = NA,
+        type = 2
+    )
+```
+
+#### Table 2
+```{r}
+df_sharp <- rbind(df_CRPS_r, df_logscore_r, df_DM) %>%
+    gather(-stat, -model, -`Common factor`, -type, key = var, value = value) %>%
+    mutate(value = round(value, 3)) %>%
+    spread(key = var, value = value) %>%
+    relocate(stat, model, `Common factor`, type) %>%
+    arrange(stat, model, `Common factor`) %>%
+    mutate(
+        model = ifelse(type == 2, "", model),
+        `Common factor` = ifelse(type == 2, "", `Common factor`)
+    ) %>%
+    select(-stat, -type)
+
+a <- cbind(df_sharp[1:12, ], df_sharp[13:24, 3:6])
+colnames(a)[7:10] <- c("zero", "one", "two", "m")
+df_sharp <- as_tibble(a) %>%
+    select(-model)
+
+stargazer(df_sharp, summary = F, rownames = F, colnames = T)
+```
+
+
+### Cummulated stats, fig 7
+#### Real-time stats by model family and specification
+```{r}
+cummulated_stats <- function(step_i) {
+    ######## AR 2 model
+    df_AR <- AR_2_results$Student$df_result %>%
+        mutate(MAE = sqrt(SQE)) %>%
+        select(vintage, log_score, CRPS, SQE, MAE) %>%
+        mutate(
+            model = names(AR_2_results)[1],
+            RMSE = sqrt(cummean(SQE)),
+            MAE = cummean(MAE),
+            CRPS = cummean(CRPS),
+            log_score = cummean(-log_score)
+        ) %>%
+        relocate(model) %>%
+        select(-SQE) %>%
+        mutate(
+            model = "Student's t AR2",
+            `Common factor` = "(4) No common factor"
+        ) %>%
+        select(-RMSE, -MAE)
+
+    ######## Factor Augmented
+    df_FA <- c()
+    for (i in 1:3) {
+        df_i <- FactorAugmented[[i]]$df_result %>%
+            mutate(MAE = sqrt(SQE)) %>%
+            filter(step == step_i) %>%
+            select(vintage, log_score, CRPS, SQE, MAE) %>%
+            mutate(
+                model = names(FactorAugmented)[i],
+                RMSE = sqrt(cummean(SQE)),
+                MAE = cummean(MAE),
+                CRPS = cummean(CRPS),
+                log_score = cummean(-log_score)
+            ) %>%
+            relocate(model) %>%
+            select(-SQE) %>%
+            select(-RMSE, -MAE)
+
+        df_FA %<>% rbind(df_i)
+    }
+    df_FA %<>% mutate(
+        `Common factor` = model,
+        `Common factor` = str_remove(`Common factor`, "_MIDAS"),
+        `Common factor` = ifelse(`Common factor` == "L", "(3) Location common factor", `Common factor`),
+        `Common factor` = ifelse(`Common factor` == "LS", "(2) Location & scale common factors", `Common factor`),
+        `Common factor` = ifelse(`Common factor` == "LSS", "(1) Location, scale & shape common factors", `Common factor`),
+        model = "Skew-t Factor Augmented MIDAS"
+    )
+
+    ########
+    df_SD_DFM <- c()
+    for (i in 1:3) {
+        df_i <- scoredriven_dfm[[i]]$df_result %>%
+            mutate(MAE = sqrt(SQE)) %>%
+            filter(step == step_i) %>%
+            select(vintage, log_score, CRPS, SQE, MAE) %>%
+            mutate(
+                model = names(scoredriven_dfm)[i],
+                RMSE = sqrt(cummean(SQE)),
+                MAE = cummean(MAE),
+                CRPS = cummean(CRPS),
+                log_score = cummean(-log_score)
+            ) %>%
+            relocate(model) %>%
+            select(-SQE) %>%
+            select(-RMSE, -MAE)
+
+        df_SD_DFM %<>% rbind(df_i)
+    }
+    df_SD_DFM %<>% mutate(
+        `Common factor` = model,
+        `Common factor` = ifelse(`Common factor` == "L", "(3) Location common factor", `Common factor`),
+        `Common factor` = ifelse(`Common factor` == "LS", "(2) Location & scale common factors", `Common factor`),
+        `Common factor` = ifelse(`Common factor` == "LSS", "(1) Location, scale & shape common factors", `Common factor`),
+        model = "Skew-t Mixed-Frequency Factor Model"
+    )
+
+    df_all <- rbind(df_AR, df_FA, df_SD_DFM) %>%
+        mutate(`Average log score (negative)` = log_score) %>%
+        relocate(model, `Common factor`) %>%
+        select(-log_score)
+}
+
+df_0 <- cummulated_stats(0) %>%
+    mutate(step = "(c) End of the quarter")
+df_1 <- cummulated_stats(1) %>%
+    mutate(step = "(b) Middle of the quarter")
+df_2 <- cummulated_stats(2) %>%
+    mutate(step = "(a) Beginning of the quarter")
+
+df_cum_stats <- rbind(df_0, df_1, df_2)
+``` 
+
+#### Graphs of the log score, CRPS, RMSE and MAE
+```{r}
+p <- paletteer_d("Redmonder::qPBI")[c(3, 1, 2)]
+
+ggplot(gather(df_cum_stats, -model, -`Common factor`, -vintage, -step, key = "statistic", value = "value")) +
+    geom_rect(data = df_recessions[6:7, ], aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "black", alpha = 0.2) +
+    geom_line(aes(vintage, value, colour = model, linetype = `Common factor`), alpha = 0.8) +
+    ggh4x::facet_nested_wrap(~ step + statistic, nrow = 4, ncol = 2, scales = "free_y") +
+    theme +
+    guides(
+        colour = guide_legend(nrow = 4, byrow = TRUE),
+        linetype = guide_legend(nrow = 4, byrow = TRUE)
+    ) +
+    xlab("Date") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15) +
+    scale_color_manual(values = p)
+
+ggsave("figures/fig7.pdf",
+    plot = last_plot(),
+    scale = 1, width = 8, height = 10
+)
+```
+
+### Graphs of the prediction with best critical region, fig 6
+#### Predi AR2
+```{r}
+p <- as.vector(unlist(pal_unikn_pref))
+
+### The AR2 gives the same results for every month during the nowcasting window since its data are not updated
+df_density_prediction <- AR_2_results$Student$df_result %>%
+    mutate(quarter = as.yearqtr(vintage) - 1 / 4) %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    )
+
+df_g_AR2 <- df_density_prediction %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(
+        model = "",
+        approach = "Student's t AR2"
+    )
+```
+
+#### Predi Factor augmented
+```{r}
+library(HDInterval)
+
+p <- as.vector(unlist(pal_unikn_pref))
+i <- 4
+
+################################# Location
+df_loc <- FactorAugmented$L$df_result %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    ) %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(model = "(a) With location common factor (CF)")
+
+################################# Scale
+df_locscale <- FactorAugmented$LS$df_result %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    ) %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(model = "(b) With location and scale CFs")
+
+################################# Shape
+df_locscaleshape <- FactorAugmented$LSS$df_result %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    ) %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(model = "(c) With location and scale and shape CFs")
+
+df_g_FA <- rbind(
+    df_loc,
+    df_locscale,
+    df_locscaleshape
+) %>%
+    mutate(approach = "Skew t Factor Augmented MIDAS")
+```
+
+#### Predi SD DFM
+```{r}
+p <- as.vector(unlist(pal_unikn_pref))
+i <- 4
+
+################################# Location
+df_loc <- scoredriven_dfm$L$df_result %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    ) %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(model = "(a) With location common factor (CF)")
+
+################################# Scale
+df_locscale <- scoredriven_dfm$LS$df_result %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    ) %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(model = "(b) With location and scale CFs")
+
+################################# Shape
+df_locscaleshape <- scoredriven_dfm$LSS$df_result %>%
+    select(vintage, outcome, conditional_mean, HDI_low, HDI_high) %>%
+    rename(
+        `Official GDP figure` = outcome,
+        `Point nowcast (conditional mean)` = conditional_mean
+    ) %>%
+    gather(-vintage, -HDI_low, -HDI_high, key = "var", value = value) %>%
+    mutate(model = "(c) With location and scale and shape CFs")
+
+df_g_DFM <- rbind(
+    df_loc,
+    df_locscale,
+    df_locscaleshape
+) %>%
+    mutate(approach = "Skew t Mixed Frequency Factor Model")
+```
+
+#### fig 6
+```{r}
+p <- paletteer_d("Redmonder::qPBI")[c(3, 2, 1)]
+df_g <- rbind(df_g_DFM, df_g_FA, df_g_AR2)
+
+ggplot(df_g) +
+    geom_rect(data = df_recessions[6:7, ], aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf, fill = "Recession"), alpha = 0.7) +
+    geom_ribbon(aes(vintage, ymin = HDI_low, ymax = HDI_high, fill = "68% Best Critical Region"), alpha = 0.4) +
+    geom_line(aes(vintage, value, colour = var, linetype = var)) +
+    scale_linetype_manual(
+        values = c("dashed", "solid"),
+        guide = guide_legend(nrow = 2, byrow = TRUE)
+    ) +
+    scale_fill_manual(
+        name = c("68% Best Critical Region", "Recession"),
+        values = c(p[3], "grey90"),
+        guide = guide_legend(nrow = 2, byrow = TRUE)
+    ) +
+    facet_nested_wrap(~ approach + model, nrow = 4, ncol = 2, scales = "free_y") +
+    theme +
+    theme(legend.position = c(0.7, 0.1)) +
+    guides(color = guide_legend(nrow = , byrow = TRUE)) +
+    xlab("") +
+    ylab("GDP growth QoQ%") +
+    scale_x_yearmon(format = "%y", n = 7) +
+    scale_color_manual(values = p)
+#
+ggsave("figures/fig6.pdf",
+    plot = last_plot(),
+    scale = 1, width = 9, height = 12
+)
+```
+
+### Close look at the financial crisis and covid pandemic
+```{r}
+GFC <- unique(yearqtr(seq(df_recessions[6, 1], df_recessions[6, 2], by = 1 / 12)))
+Covid <- unique(yearqtr(seq(df_recessions[7, 1], df_recessions[7, 2] + 1 / 12, by = 1 / 12))) # added a month to the through to include the strong rebound
+
+t_in_GFC <- c()
+t_in_covid <- c()
+q_in_GFC_AR2 <- c()
+q_in_covid_AR2 <- c()
+for (t in 1:nrow(FactorAugmented[[1]]$df_result)) {
+    if (yearqtr(FactorAugmented[[1]]$df_result$vintage[t] - 1 / 12) %in% GFC) {
+        t_in_GFC <- c(t_in_GFC, t)
+    }
+    if (yearqtr(FactorAugmented[[1]]$df_result$vintage[t] - 1 / 12) %in% Covid) {
+        t_in_covid <- c(t_in_covid, t)
+    }
+}
+
+t_in_GFC_AR2 <- c()
+t_in_covid_AR2 <- c()
+for (t in 1:nrow(AR_2_results$Student$df_result)) {
+    if (yearqtr(AR_2_results$Student$df_result$vintage[t] - 1 / 12) %in% GFC) {
+        t_in_GFC_AR2 <- c(t_in_GFC_AR2, t)
+    }
+    if (yearqtr(AR_2_results$Student$df_result$vintage[t] - 1 / 12) %in% Covid) {
+        t_in_covid_AR2 <- c(t_in_covid_AR2, t)
+    }
+}
+```
+
+#### Graphs for the pandemic
+```{r}
+# p <- as.vector(unlist(pal_unikn_pref))[c(1,2,10)]
+p <- paletteer_d("Redmonder::qPBI")[c(3, 1, 2)]
+lwd <- 1.5
+pdf(
+    file = "figures/fig8.pdf",
+    width = 8.5,
+    height = 8
+)
+layout(rbind(1:3, 4:6, 7:9))
+par(mai = c(0.3, 0.3, 0.3, 0.3), cex = 0.7)
+
+############ Q1 2020
+j <- 1
+plot(AR_2_results$Student$density_nowcast[[53]],
+    type = "l", main = "February 2020",
+    xlab = "", ylab = "", xlim = c(-2, 2), ylim = c(0, 1.8), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+j <- 2
+plot(AR_2_results$Student$density_nowcast[[53]],
+    type = "l", main = "March 2020",
+    xlab = "", ylab = "", xlim = c(-2, 2), ylim = c(0, 1.8), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+j <- 3
+plot(AR_2_results$Student$density_nowcast[[53]],
+    type = "l", main = "April 2020",
+    xlab = "", ylab = "", xlim = c(-8, 2), ylim = c(0, 1.8), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+legend("topleft",
+    legend = c(
+        "St t AR2", "Sk t Factor Augmented MIDAS", "Sk t Mixed-Frequency Factor Model",
+        "Location common factor (CF)", "Location & scale CFs", "Location, scale & shape CFs"
+    ),
+    col = c("black", p[1], p[2], "black", "black", "black"),
+    lty = c(1, 1, 1, 3, 2, 1)
+)
+############ Q2 2020
+j <- 4
+plot(AR_2_results$Student$density_nowcast[[54]],
+    type = "l", main = "May 2020",
+    xlab = "", ylab = "", xlim = c(-10, 5), ylim = c(0, 0.8), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+j <- 5
+plot(AR_2_results$Student$density_nowcast[[54]],
+    type = "l", main = "June 2020",
+    xlab = "", ylab = "", xlim = c(-10, 5), ylim = c(0, 0.5), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+j <- 6
+plot(AR_2_results$Student$density_nowcast[[54]],
+    type = "l", main = "July 2020",
+    xlab = "", ylab = "", xlim = c(-14, 9), ylim = c(0, 0.3), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+############ Q3 2020
+j <- 7
+plot(AR_2_results$Student$density_nowcast[[55]],
+    type = "l", main = "August 2020",
+    xlab = "", ylab = "", xlim = c(-5, 10), ylim = c(0, 1.2), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+j <- 8
+plot(AR_2_results$Student$density_nowcast[[55]],
+    type = "l", main = "September 2020",
+    xlab = "", ylab = "", xlim = c(-5, 10), ylim = c(0, 1.2), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+
+j <- 9
+plot(AR_2_results$Student$density_nowcast[[55]],
+    type = "l", main = "October 2020",
+    xlab = "", ylab = "", xlim = c(-5, 10), ylim = c(0, 1.2), col = p[3]
+)
+lines(FactorAugmented$LSS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 1)
+lines(FactorAugmented$LS$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 2)
+lines(FactorAugmented$L$density_nowcast[[t_in_covid[j]]], col = p[1], lty = 3)
+lines(scoredriven_dfm$LSS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 1)
+lines(scoredriven_dfm$LS$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 2)
+lines(scoredriven_dfm$L$out_of_sample_stats[[t_in_covid[j]]]$density, col = p[2], lty = 3)
+abline(v = FactorAugmented[[1]]$df_result$outcome[t_in_covid[j]], lty = 2, col = "black")
+dev.off()
+```
+
+#### Table 3
+```{r}
+GFC <- seq(as.yearmon("Oct 2007"), df_recessions[6, 2], by = 1 / 12)
+Covid <- seq(as.yearmon("Jan 2020"), as.yearmon("Sep 2020"), by = 1 / 12) # added a month to the through to include the strong rebound
+
+######## AR 2 model
+df_AR <- AR_2_results$Student$df_result %>%
+    mutate(
+        MAE = sqrt(SQE),
+        vintage = as.yearmon(vintage),
+        period = "a expansion",
+        period = ifelse((yearmon(vintage - 1 / 12) %in% Covid), "c Covid", period),
+        period = ifelse((yearmon(vintage - 1 / 12) %in% GFC), "b GFC", period)
+    ) %>%
+    group_by(period) %>%
+    summarise(
+        RMSE = sqrt(mean(SQE)),
+        MAE = mean(MAE),
+        CRPS = mean(CRPS),
+        log_score = mean(log_score)
+    ) %>%
+    mutate(
+        model = "Student's t AR2",
+        `Common factor` = "No common factor"
+    ) %>%
+    relocate(period, model, `Common factor`)
+
+######## Factor Augmented
+df_FA <- c()
+for (i in 1:3) {
+    df_i <- FactorAugmented[[i]]$df_result %>%
+        mutate(
+            MAE = sqrt(SQE),
+            period = "a expansion",
+            period = ifelse((yearmon(vintage - 1 / 12) %in% Covid), "c Covid", period),
+            period = ifelse((yearmon(vintage - 1 / 12) %in% GFC), "b GFC", period)
+        ) %>%
+        group_by(period) %>%
+        summarise(
+            RMSE = sqrt(mean(SQE)),
+            MAE = mean(MAE),
+            CRPS = mean(CRPS),
+            log_score = mean(log_score)
+        ) %>%
+        mutate(`Common factor` = names(FactorAugmented)[i])
+
+    df_FA %<>% rbind(df_i)
+}
+df_FA %<>% mutate(
+    `Common factor` = str_remove(`Common factor`, "_MIDAS"),
+    `Common factor` = ifelse(`Common factor` == "L", "Location", `Common factor`),
+    `Common factor` = ifelse(`Common factor` == "LS", "Location, scale", `Common factor`),
+    `Common factor` = ifelse(`Common factor` == "LSS", "Location, scale, shape", `Common factor`),
+    model = "Sk t Factor Augmented MIDAS"
+) %>%
+    arrange(period) %>%
+    relocate(period, model, `Common factor`)
+
+########
+df_SD_DFM <- c()
+for (i in 1:3) {
+    df_i <- scoredriven_dfm[[i]]$df_result %>%
+        mutate(
+            MAE = sqrt(SQE),
+            period = "a expansion",
+            period = ifelse((yearmon(vintage - 1 / 12) %in% Covid), "c Covid", period),
+            period = ifelse((yearmon(vintage - 1 / 12) %in% GFC), "b GFC", period)
+        ) %>%
+        group_by(period) %>%
+        summarise(
+            RMSE = sqrt(mean(SQE)),
+            MAE = mean(MAE),
+            CRPS = mean(CRPS),
+            log_score = mean(log_score)
+        ) %>%
+        mutate(`Common factor` = names(scoredriven_dfm)[i])
+
+    df_SD_DFM %<>% rbind(df_i)
+}
+df_SD_DFM %<>% mutate(
+    `Common factor` = ifelse(`Common factor` == "L", "Location", `Common factor`),
+    `Common factor` = ifelse(`Common factor` == "LS", "Location, scale", `Common factor`),
+    `Common factor` = ifelse(`Common factor` == "LSS", "Location, scale, shape", `Common factor`),
+    model = "Sk t MF Factor Model"
+) %>%
+    arrange(period) %>%
+    relocate(period, model, `Common factor`)
+
+df_all <- rbind(df_AR, df_FA, df_SD_DFM) %>%
+    mutate(log_score = log_score) %>%
+    relocate(period, model, `Common factor`) %>%
+    arrange(model, period, `Common factor`) %>%
+    select(-RMSE, -MAE)
+
+df_all[, 4:5] <- round(df_all[, 4:5], 2)
+
+stargazer(df_all[, -2], summary = FALSE, rownames = FALSE, colnames = F)
+```
+
+#### Factor loadings over time, fig 1
+```{r}
+df_loadings <- as_tibble(scoredriven_dfm$LSS$df_factor_loading)
+df_i <- df_loadings %>%
+    distinct() %>%
+    rename(
+        location = FL_loc,
+        scale = FL_scale,
+        shape = FL_shape,
+        series = series_label
+    ) %>%
+    gather(-period, -series, value = value, key = parameter) %>%
+    mutate(value = as.numeric(value)) %>%
+    group_by(parameter, series) %>%
+    summarise(value = mean(value, na.rm = T)) %>%
+    ungroup() %>%
+    select(series, value, parameter) %>%
+    mutate(
+        series = ifelse(series == "VIXCLSx", "VIX", series),
+        series = ifelse(series == "UNRATE", "Civilian Unemployment Rate", series),
+        series = ifelse(series == "UMCSENTx", "Consumer Sentiment Index", series),
+        series = ifelse(series == "RPI", "Real Personal Income", series),
+        series = ifelse(series == "RETAILx", "Retail and Food Services Sales", series),
+        series = ifelse(series == "PAYEMS", "Total nonfarm employment", series),
+        series = ifelse(series == "INDPRO", "Industrial Production", series),
+        series = ifelse(series == "HWI", "Help-Wanted Index for United States", series),
+        series = ifelse(series == "DPCERA3M086SBEA", "Real personal consumption expenditures", series),
+        series = ifelse(series == "CUMFNS", "Capacity Utilization: Manufacturing", series),
+        series = ifelse(series == "CLAIMSx", "Initial Claims", series),
+        series = ifelse(series == "CE16OV", "Civilian Employment", series)
+    )
+
+ggplot(df_i, aes(parameter, series, fill = value)) +
+    geom_tile() +
+    geom_tile(colour = "white", size = 0.25) +
+    scale_fill_gradient2(
+        low = paletteer_d("Redmonder::qPBI")[3],
+        mid = "white",
+        high = paletteer_d("Redmonder::qPBI")[1]
+    )
+
+ggsave("figures/fig1.pdf",
+    plot = last_plot(),
+    scale = 1, width = 5, height = 5
+)
+```
+
+#### Real-time common factors, fig 2
+```{r}
+load("results/monthly_dfm.Rdata")
+
+list_factors <- monthly_dfm
+library(paletteer)
+p <- paletteer_d("Redmonder::qPBI")[c(1, 3, 2)]
+
+df_real_time_LSS <- c()
+df_real_time_LS <- c()
+df_real_time_L <- c()
+
+for (i in 1:length(list_factors$LSS)) {
+    df_real_time_LSS %<>% rbind(filter(list_factors$LSS[[i]]$df, date == vintage - 1 / 12))
+    df_real_time_LS %<>% rbind(filter(list_factors$LS[[i]]$df, date == vintage - 1 / 12))
+    df_real_time_L %<>% rbind(filter(list_factors$L[[i]]$df, date == vintage - 1 / 12))
+}
+
+df_real_time_L %<>%
+    mutate(model = "a: Model with location common factor only")
+
+df_real_time_LS %<>%
+    mutate(model = "b: Model with location and scale common factors")
+
+df_real_time_LSS %<>%
+    mutate(model = "c: Model with location, scale and shape common factors")
+
+df_real_time <- rbind(
+    df_real_time_L,
+    df_real_time_LS,
+    df_real_time_LSS
+) %>%
+    mutate(
+        shape_CF = ifelse(model == "c: Model with location, scale and shape common factors", shape_CF, NA),
+        scale_CF = ifelse(model == "a: Model with location common factor only", NA, scale_CF)
+    ) %>%
+    rename(
+        `Location Common Factor` = loc_CF,
+        `Scale Common Factor` = scale_CF,
+        `Shape Common Factor` = shape_CF
+    ) %>%
+    select(-GDP, -outcome, -date) %>%
+    gather(-vintage, -model, key = "CF", value = "value")
+
+
+ggplot(df_real_time) +
+    geom_rect(data = df_recessions[6:7, ], aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = "grey55", alpha = 0.2) +
+    geom_line(aes(vintage, value, colour = model), alpha = 0.8) +
+    facet_wrap(~CF, nrow = 3, scales = "free_y") +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "grey55") +
+    theme +
+    guides(colour = guide_legend(nrow = 3, byrow = TRUE)) +
+    xlab("Vintage") +
+    ylab("") +
+    scale_x_yearmon(format = "%y", n = 15) +
+    scale_color_manual(values = p)
+
+
+ggsave("figures/fig2.pdf",
+    plot = last_plot(),
+    scale = 1, width = 8, height = 7
+)
+```
