@@ -9,7 +9,7 @@ differentiation library `CppAD`. This code is then wrapped into a
 package using `Rcpp`. The package can be installed with:
 
 ``` r
-devtool::install_github(paullabonne/IJF_24/RcppScoreDrivenDFM)
+devtools::install_github("paullabonne/IJF_24/RcppScoreDrivenDFM")
 ```
 
 - `R/intro.R` loads/install all the packages needed.
