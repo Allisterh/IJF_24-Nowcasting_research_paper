@@ -12,7 +12,7 @@ package using `Rcpp`. The package can be installed with:
 devtools::install_github("paullabonne/IJF_24/RcppScoreDrivenDFM")
 ```
 
-- `R/intro.R` loads/install all the packages needed.
+- `R/intro.R` loads/installs all the packages needed.
 - `R/sd_dfm.R` contains functions for estimation, forecast evaluation,
   simulation etc.
 - The `quarto` files in the notebooks folder replicate the paper, i.e.,
