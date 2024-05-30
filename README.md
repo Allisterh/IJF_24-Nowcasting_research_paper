@@ -3,6 +3,7 @@
 Replication code for the paper Labonne, P. (2024). “Asymmetric
 Uncertainty: Nowcasting using skewness in real-time data.”
 *International Journal of Forecasting*
+https://doi.org/10.1016/j.ijforecast.2024.05.003
 
 The score-driven models are written `C++` to make use of the automatic
 differentiation library `CppAD`. This code is then wrapped into a
